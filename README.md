@@ -1,3 +1,32 @@
+# JAP Dashboard — Junior Adoption Program
+
+A Next.js 16 App Router application with Firebase backend for managing the Junior Adoption Program (JAP). Mentors, mentees, and admins each have role-scoped dashboards.
+
+## Features
+
+### Proactive Risk Alerts (Mentor Dashboard)
+
+The mentor dashboard shows a dismissable alert banner above the stats cards whenever a mentee needs attention, so mentors see risk on page load without drilling into records.
+
+An alert is raised when:
+
+| Signal | Threshold | Alert text |
+| --- | --- | --- |
+| Mentee risk level | `riskLevel = High` | `<Name> — High risk` |
+| Mentee confidence | `confidenceScore <= 2` (inclusive at 2) | `<Name> — Confidence X/5` |
+| Stale submission | `PENDING` for **more than** 3 days (exactly 3 days does not alert) | `<Name> — '<Assignment>' pending for Xd` |
+
+Behaviour notes:
+- A single mentee can raise multiple alert items (e.g. High risk *and* low confidence).
+- If no condition is met, the banner is not rendered at all.
+- **Dismiss** hides the banner for the rest of the browser session via `sessionStorage` (key `jap-risk-alerts-dismissed`). A new tab or new browser session shows it again.
+- The banner uses `role="alert"` so screen readers announce it when it appears.
+- Alerts are computed client-side with `useMemo` — no extra network requests.
+
+Implementation: `src/app/dashboard/mentor/page.tsx` · JIRA: EPMCDMETST-63047
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
