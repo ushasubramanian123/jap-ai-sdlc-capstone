@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useMockStore } from "@/lib/mock-store";
 import {
@@ -67,6 +67,41 @@ export default function MentorDashboard() {
     : mockStore.submissions.filter((s) => menteeIds.includes(s.menteeId));
 
   const [activeTab, setActiveTab] = useState<"submissions" | "mentees" | "feedback">("submissions");
+
+  // Alert banner dismiss (session-scoped)
+  const [alertDismissed, setAlertDismissed] = useState(false);
+  useEffect(() => {
+    if (sessionStorage.getItem("jap-risk-alerts-dismissed") === "1") setAlertDismissed(true);
+  }, []);
+
+  function handleDismissAlerts() {
+    sessionStorage.setItem("jap-risk-alerts-dismissed", "1");
+    setAlertDismissed(true);
+  }
+
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+  const alertItems = useMemo(() => {
+    const items: { key: string; text: string }[] = [];
+    const now = Date.now();
+    for (const m of mentees) {
+      if (m.riskLevel === "High")
+        items.push({ key: `risk-${m.id}`, text: `${m.name} — High risk` });
+      if (m.confidenceScore <= 2)
+        items.push({ key: `conf-${m.id}`, text: `${m.name} — Confidence ${m.confidenceScore}/5` });
+    }
+    for (const sub of submissions) {
+      if (sub.mentorStatus === "PENDING" && now - sub.submittedAt > THREE_DAYS_MS) {
+        const mentee = mentees.find((m) => m.id === sub.menteeId);
+        const assignment = assignments.find((a) => a.id === sub.assignmentId);
+        const days = Math.floor((now - sub.submittedAt) / 86_400_000);
+        items.push({
+          key: `overdue-${sub.id}`,
+          text: `${mentee?.name ?? "Mentee"} — "${assignment?.title ?? "Submission"}" pending for ${days}d`,
+        });
+      }
+    }
+    return items;
+  }, [mentees, submissions, assignments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Submission review state
   const [reworkId, setReworkId] = useState<string | null>(null);
@@ -273,6 +308,43 @@ export default function MentorDashboard() {
             Prioritize buddy connects, feedback loops, and red-flag detection for your assigned mentees.
           </p>
         </section>
+
+        {/* Proactive Risk Alerts */}
+        {!alertDismissed && alertItems.length > 0 && (
+          <section
+            role="alert"
+            className="rounded-[1.5rem] border border-rose-200 bg-rose-50 p-5 shadow-[0_8px_32px_rgba(225,29,72,0.10)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <span className="mt-0.5 shrink-0 text-rose-600" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                  </svg>
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-rose-800">
+                    {alertItems.length} mentee{alertItems.length !== 1 ? "s" : ""} need{alertItems.length === 1 ? "s" : ""} your attention
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {alertItems.map((item) => (
+                      <li key={item.key} className="text-sm text-rose-700">
+                        {item.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <button
+                onClick={handleDismissAlerts}
+                aria-label="Dismiss alerts"
+                className="shrink-0 rounded-xl border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-white transition"
+              >
+                Dismiss
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* Stats */}
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
